@@ -1,7 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { useAuth } from "./hooks/useAuth";
-import { studentApi } from "./api";
+import { useAuthContext } from "./context/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -12,23 +10,15 @@ import AdminSkillTreePage from "./pages/admin/AdminSkillTreePage";
 import AdminProblemsPage from "./pages/admin/AdminProblemsPage";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuthContext();
+  if (loading) return <div style={{ color: "#8b949e", textAlign: "center", padding: 80 }}>読み込み中...</div>;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    studentApi.getDashboard()
-      .then((r) => setIsAdmin(r.data.user.is_admin))
-      .catch(() => setIsAdmin(false));
-  }, [isAuthenticated]);
-
+  const { isAuthenticated, isAdmin, loading } = useAuthContext();
+  if (loading) return <div style={{ color: "#8b949e", textAlign: "center", padding: 80 }}>読み込み中...</div>;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (isAdmin === null) return null;
   if (!isAdmin) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
