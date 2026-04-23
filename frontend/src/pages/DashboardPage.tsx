@@ -32,7 +32,7 @@ export default function DashboardPage() {
           <span style={styles.exp}>{dashboard.user.total_exp} EXP</span>
           <span style={styles.streak}>🔥 {dashboard.user.streak_days}日</span>
           {isAdmin && (
-            <button style={styles.adminBtn} onClick={() => navigate("/admin/languages")}>
+            <button style={styles.adminBtn} onClick={() => navigate("/admin")}>
               ⚙ 管理者画面
             </button>
           )}

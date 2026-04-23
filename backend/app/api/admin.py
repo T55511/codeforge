@@ -2,7 +2,7 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from app.database import get_db
 from app.models.language import Language
 from app.models.tag import Tag, TagDependency
@@ -20,6 +20,27 @@ from app.services.ai import generate_problems
 from app.workers.tasks import generate_problems_task
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+# ---- 統計 ----
+
+@router.get("/stats")
+async def get_stats(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_admin_user),
+):
+    user_count = (await db.execute(select(func.count(User.id)))).scalar_one()
+    problem_count = (await db.execute(select(func.count(Problem.id)))).scalar_one()
+    tag_count = (await db.execute(select(func.count(Tag.id)))).scalar_one()
+    approved_count = (await db.execute(
+        select(func.count(Problem.id)).where(Problem.status == "APPROVED")
+    )).scalar_one()
+    return {
+        "user_count": user_count,
+        "problem_count": problem_count,
+        "tag_count": tag_count,
+        "approved_count": approved_count,
+    }
 
 
 # ---- 言語管理 ----

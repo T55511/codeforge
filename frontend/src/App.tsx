@@ -6,6 +6,9 @@ import DashboardPage from "./pages/DashboardPage";
 import SkillTreePage from "./pages/SkillTreePage";
 import WorkspacePage from "./pages/WorkspacePage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
+import AdminLanguagesPage from "./pages/admin/AdminLanguagesPage";
+import AdminSkillTreePage from "./pages/admin/AdminSkillTreePage";
+import AdminProblemsPage from "./pages/admin/AdminProblemsPage";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuthContext();
@@ -39,9 +42,33 @@ export default function App() {
         <Route
           path="/admin"
           element={
-            <PrivateRoute>
+            <AdminRoute>
               <AdminDashboardPage />
-            </PrivateRoute>
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/languages"
+          element={
+            <AdminRoute>
+              <AdminLanguagesPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/skill-tree"
+          element={
+            <AdminRoute>
+              <AdminSkillTreePage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/problems"
+          element={
+            <AdminRoute>
+              <AdminProblemsPage />
+            </AdminRoute>
           }
         />
         <Route
