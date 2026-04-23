@@ -29,6 +29,11 @@ export default function DashboardPage() {
           <span style={styles.rank}>{dashboard.user.rank}</span>
           <span style={styles.exp}>{dashboard.user.total_exp} EXP</span>
           <span style={styles.streak}>🔥 {dashboard.user.streak_days}日</span>
+          {dashboard.user.is_admin && (
+            <button style={styles.adminBtn} onClick={() => navigate("/admin/languages")}>
+              ⚙ 管理者画面
+            </button>
+          )}
         </div>
       </header>
 
@@ -100,6 +105,7 @@ const styles: Record<string, React.CSSProperties> = {
   rank: { background: "#1f6feb", color: "#fff", padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600 },
   exp: { color: "#f0c946", fontWeight: 600 },
   streak: { color: "#ff6e40", fontWeight: 600 },
+  adminBtn: { background: "#6e40c9", color: "#fff", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" },
   main: { maxWidth: 1000, margin: "0 auto", padding: "40px 24px" },
   statsRow: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 40 },
   statCard: {
