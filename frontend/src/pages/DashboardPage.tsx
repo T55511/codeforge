@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { studentApi } from "../api";
+import { useAuthContext } from "../context/AuthContext";
 import type { DashboardData, Language } from "../types";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const { isAdmin } = useAuthContext();
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [languages, setLanguages] = useState<Language[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +31,7 @@ export default function DashboardPage() {
           <span style={styles.rank}>{dashboard.user.rank}</span>
           <span style={styles.exp}>{dashboard.user.total_exp} EXP</span>
           <span style={styles.streak}>🔥 {dashboard.user.streak_days}日</span>
-          {dashboard.user.is_admin && (
+          {isAdmin && (
             <button style={styles.adminBtn} onClick={() => navigate("/admin/languages")}>
               ⚙ 管理者画面
             </button>
