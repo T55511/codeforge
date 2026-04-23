@@ -31,6 +31,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     environment:
       DATABASE_URL: postgresql+asyncpg://cf_admin:cf_pass_2026@postgres:5432/codeforge_db
       REDIS_URL: redis://redis:6379/0
