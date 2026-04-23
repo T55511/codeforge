@@ -1,0 +1,49 @@
+"""認証エンドポイント"""
+from datetime import datetime, timedelta
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from app.database import get_db
+from app.models.user import User, UserQuota
+from app.schemas.user import UserCreate, UserOut, TokenResponse, LoginRequest
+from app.services.auth import hash_password, verify_password, create_access_token
+
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.post("/register", response_model=UserOut, status_code=201)
+async def register(body: UserCreate, db: AsyncSession = Depends(get_db)):
+    existing = await db.execute(select(User).where(User.email == body.email))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="このメールアドレスはすでに登録されています")
+
+    user = User(
+        name=body.name,
+        email=body.email,
+        hashed_password=hash_password(body.password),
+    )
+    db.add(user)
+    await db.flush()
+
+    quota = UserQuota(
+        user_id=user.id,
+        daily_count=0,
+        limit=10,
+        reset_at=datetime.utcnow().replace(hour=0, minute=0, second=0) + timedelta(days=1),
+    )
+    db.add(quota)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+@router.post("/login", response_model=TokenResponse)
+async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.email == body.email))
+    user = result.scalar_one_or_none()
+    if not user or not verify_password(body.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="メールアドレスまたはパスワードが正しくありません",
+        )
+    return {"access_token": create_access_token(user.id)}
