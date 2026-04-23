@@ -100,6 +100,25 @@ async def get_skill_tree(
     return nodes
 
 
+@router.get("/problems/next")
+async def get_next_problem(
+    tag_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """指定タグの承認済み問題をランダムに1件返す"""
+    result = await db.execute(
+        select(Problem)
+        .where(Problem.tag_id == tag_id, Problem.status == "APPROVED")
+        .order_by(func.random())
+        .limit(1)
+    )
+    problem = result.scalar_one_or_none()
+    if not problem:
+        raise HTTPException(status_code=404, detail="このスキルには問題がまだありません")
+    return {"problem_id": str(problem.id), "title": problem.title}
+
+
 @router.get("/me/dashboard", response_model=DashboardOut)
 async def get_dashboard(
     db: AsyncSession = Depends(get_db),

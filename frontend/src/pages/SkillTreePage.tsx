@@ -17,6 +17,18 @@ export default function SkillTreePage() {
   const [nodes, setNodes] = useState<SkillTreeNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("すべて");
+  const [nodeError, setNodeError] = useState<string>("");
+
+  const handleNodeSelect = async (tagId: string) => {
+    setNodeError("");
+    try {
+      const res = await studentApi.getNextProblem(tagId);
+      navigate(`/workspace/${res.data.problem_id}`);
+    } catch {
+      setNodeError("このスキルにはまだ問題がありません");
+      setTimeout(() => setNodeError(""), 3000);
+    }
+  };
 
   useEffect(() => {
     if (!languageId) return;
@@ -38,6 +50,7 @@ export default function SkillTreePage() {
         <button style={styles.back} onClick={() => navigate("/")}>← ダッシュボード</button>
         <h1 style={styles.title}>スキルツリー</h1>
       </header>
+      {nodeError && <div style={styles.errorBanner}>{nodeError}</div>}
 
       <div style={styles.filterRow}>
         {categories.map((cat) => (
@@ -56,7 +69,7 @@ export default function SkillTreePage() {
 
       <div style={styles.grid}>
         {filtered.map((node) => (
-          <SkillNode key={node.id} node={node} onSelect={() => navigate(`/problems/${node.id}`)} />
+          <SkillNode key={node.id} node={node} onSelect={() => handleNodeSelect(node.id)} />
         ))}
       </div>
     </div>
@@ -96,6 +109,7 @@ function SkillNode({ node, onSelect }: { node: SkillTreeNode; onSelect: () => vo
 
 const styles: Record<string, React.CSSProperties> = {
   loading: { color: "#8b949e", textAlign: "center", padding: 80 },
+  errorBanner: { background: "#3d1a1a", color: "#f85149", padding: "10px 32px", fontSize: 14 },
   container: { minHeight: "100vh", background: "#0d1117", padding: "0 0 40px" },
   header: {
     display: "flex",
