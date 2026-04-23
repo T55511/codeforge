@@ -14,6 +14,24 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     yield
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 起動時: ウォームスタンバイプールをバックグラウンドで補充
+    try:
+        from app.workers.tasks import warmup_all_pools_task
+        warmup_all_pools_task.delay()
+    except Exception:
+        pass
+    yield
+    # シャットダウン時: プール内コンテナを破棄
+    try:
+        from app.workers.tasks import drain_all_pools_task
+        drain_all_pools_task.delay()
+    except Exception:
+        pass
+
+
 app = FastAPI(
     title="CodeForge API",
     description="AI駆動型プログラミング学習プラットフォーム",
@@ -36,4 +54,7 @@ app.include_router(admin_router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    from app.services.pool_manager import pool_size
+    from app.services.sandbox import LANGUAGE_IMAGES
+    pool_status = {lang: pool_size(lang) for lang in LANGUAGE_IMAGES}
+    return {"status": "ok", "pool": pool_status}

@@ -12,10 +12,10 @@ from app.models.submission import Submission
 from app.models.user import User, UserQuota, UserTagProgress
 from app.schemas.language import LanguageOut
 from app.schemas.tag import SkillTreeNode, TagDependencyOut
-from app.schemas.problem import ExecuteRequest, ExecuteResponse, TaskResult
+from app.schemas.problem import ExecuteRequest, ExecuteResponse, TaskResult, GiveupRequest, GiveupResponse
 from app.schemas.user import DashboardOut, ChatRequest, ChatResponse, ReviewRequest, ReviewResponse
 from app.services.auth import get_current_user
-from app.services.ai import get_hint, review_code
+from app.services.ai import get_hint, review_code, get_giveup_explanation
 from app.workers.celery_app import celery_app
 from app.workers.tasks import execute_code_task
 
@@ -285,3 +285,54 @@ async def request_review(
     )
 
     return ReviewResponse(comments=comments)
+
+
+@router.post("/giveup", response_model=GiveupResponse)
+async def giveup(
+    body: GiveupRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """ギブアップ: 正解コード不提示の概念解説を返す。submissions に GIVEUP レコードを記録する。"""
+    problem_result = await db.execute(
+        select(Problem).where(Problem.id == body.problem_id, Problem.status == "APPROVED")
+    )
+    problem = problem_result.scalar_one_or_none()
+    if not problem:
+        raise HTTPException(status_code=404, detail="問題が見つかりません")
+
+    lang_result = await db.execute(select(Language).where(Language.id == problem.language_id))
+    language = lang_result.scalar_one_or_none()
+
+    explanation, key_concepts = await get_giveup_explanation(
+        problem_description=problem.description,
+        user_code=body.code,
+        language=language.name if language else "python",
+    )
+
+    # ギブアップ提出をDBに記録（EXP は付与しない）
+    from app.models.submission import Submission
+    submission = Submission(
+        user_id=current_user.id,
+        problem_id=problem.id,
+        code=body.code,
+        result="GIVEUP",
+        exp_earned=0,
+        hint_count=body.hint_count,
+    )
+    db.add(submission)
+    await db.commit()
+
+    return GiveupResponse(
+        explanation=explanation,
+        key_concepts=key_concepts,
+        hints_used=body.hint_count,
+    )
+
+
+@router.get("/sandbox/pool-status")
+async def get_pool_status(_: User = Depends(get_current_user)):
+    """ウォームスタンバイプールの現在のコンテナ数を返す"""
+    from app.services.pool_manager import pool_size
+    from app.services.sandbox import LANGUAGE_IMAGES
+    return {lang: pool_size(lang) for lang in LANGUAGE_IMAGES}
