@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useAuth } from "./hooks/useAuth";
+import { useAuthContext } from "./context/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -8,8 +8,18 @@ import WorkspacePage from "./pages/WorkspacePage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuthContext();
+  if (loading) return <div style={{ color: "#8b949e", textAlign: "center", padding: 80 }}>読み込み中...</div>;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isAdmin, loading } = useAuthContext();
+  if (loading) return <div style={{ color: "#8b949e", textAlign: "center", padding: 80 }}>読み込み中...</div>;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isAdmin) return <Navigate to="/" replace />;
+  return <>{children}</>;
 }
 
 export default function App() {
