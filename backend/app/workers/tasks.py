@@ -1,7 +1,5 @@
 """Celery 非同期タスク"""
 import asyncio
-import uuid
-from datetime import datetime
 from app.workers.celery_app import celery_app
 from app.services.judgment import judge
 from app.services.exp_calculator import calculate_exp
@@ -39,14 +37,12 @@ def execute_code_task(
         exp_total = 0
 
         if result.verdict == "PASS":
-            # 一発正解かどうかはDB確認が必要なため、タスク引数で受け取る
-            # ここでは呼び出し元で計算済みの is_first_try を使う
             breakdown = calculate_exp(
                 consecutive_in_tag=consecutive_in_tag,
                 is_first_try=(consecutive_in_tag == 0),
                 hint_count=hint_count,
-                linter_warnings=0,  # Linterは将来実装
-                runtime_ms=result.stdout and None or None,
+                linter_warnings=0,
+                runtime_ms=None,
                 memory_kb=None,
                 threshold_ms=threshold_ms,
                 threshold_kb=threshold_kb,
@@ -100,6 +96,32 @@ def execute_code_task(
 @celery_app.task(name="generate_problems_task")
 def generate_problems_task(language_id: str, tag_id: str, difficulty: int, count: int = 5):
     """AIによる問題一括生成タスク（管理者向け）"""
-    # AI生成ロジックはapp/services/ai.pyに実装
     from app.services.ai import generate_problems_sync
     return generate_problems_sync(language_id, tag_id, difficulty, count)
+
+
+@celery_app.task(name="refill_pool_task")
+def refill_pool_task(language: str) -> dict:
+    """使用後のコンテナを補充してプールを維持する"""
+    from app.services.pool_manager import warmup_pool
+    created = warmup_pool(language)
+    return {"language": language, "created": created}
+
+
+@celery_app.task(name="warmup_all_pools_task")
+def warmup_all_pools_task() -> dict:
+    """全言語のウォームスタンバイプールを起動・補充する（起動時/定期実行）"""
+    from app.services.pool_manager import warmup_all_languages
+    results = warmup_all_languages()
+    return {"results": results}
+
+
+@celery_app.task(name="drain_all_pools_task")
+def drain_all_pools_task() -> dict:
+    """シャットダウン時に全プールのコンテナを停止・削除する"""
+    from app.services.pool_manager import drain_pool
+    from app.services.sandbox import LANGUAGE_IMAGES
+    results = {}
+    for lang in LANGUAGE_IMAGES:
+        results[lang] = drain_pool(lang)
+    return {"results": results}
