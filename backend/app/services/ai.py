@@ -159,6 +159,49 @@ def generate_problems_sync(
     count: int,
 ) -> dict:
     """Celeryタスクから呼び出す同期版（DB操作はワーカー内で実施）"""
-    import asyncio
-    # DB操作が必要なため、ワーカー内での簡易実装
     return {"status": "queued", "language_id": language_id, "tag_id": tag_id, "difficulty": difficulty, "count": count}
+
+
+GIVEUP_SYSTEM_PROMPT = """あなたはプログラミング学習プラットフォーム「CodeForge」のAIメンターです。
+学習者がギブアップを選択しました。以下のルールで解説を提供してください：
+
+1. 正解コードをそのまま提示してはいけない
+2. 「なぜそのアプローチが正しいか」という概念・考え方を日本語で解説する
+3. 学習者のコードのどこに問題があったかを具体的に指摘する
+4. 次回同じ問題に取り組む際のヒントを「問い」の形で残す
+5. 学習者の努力を称え、前向きな気持ちになれるメッセージで締める
+6. JSONで返すこと: {"explanation": "解説文", "key_concepts": ["概念1", "概念2", ...]}"""
+
+
+async def get_giveup_explanation(
+    problem_description: str,
+    user_code: str,
+    language: str,
+) -> tuple[str, list[str]]:
+    """ギブアップ時の解説を生成する（正解コード不提示）"""
+
+    user_content = f"""問題文：
+{problem_description}
+
+学習者が試みたコード（{language}）：
+```
+{user_code}
+```
+
+ギブアップしました。上記ルールに従って解説をJSON形式で返してください。"""
+
+    response = await openai_client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": GIVEUP_SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+        ],
+        max_tokens=800,
+        temperature=0.6,
+        response_format={"type": "json_object"},
+    )
+
+    result = json.loads(response.choices[0].message.content)
+    explanation = result.get("explanation", "解説を生成できませんでした。")
+    key_concepts = result.get("key_concepts", [])
+    return explanation, key_concepts

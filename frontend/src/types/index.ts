@@ -97,3 +97,9 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
+
+export interface GiveupResult {
+  explanation: string;
+  key_concepts: string[];
+  hints_used: number;
+}

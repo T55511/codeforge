@@ -78,3 +78,19 @@ class GenerateProblemsRequest(BaseModel):
     tag_id: uuid.UUID
     difficulty: int = 1
     count: int = 5
+
+
+class GiveupRequest(BaseModel):
+    problem_id: uuid.UUID
+    code: str
+    hint_count: int = 0
+
+
+class GiveupResponse(BaseModel):
+    explanation: str       # ソクラテス的な解説（正解コードそのものは含まない）
+    key_concepts: list[str]  # 今回の問題で学ぶべき概念リスト
+    hints_used: int
+
+
+class PoolStatusResponse(BaseModel):
+    pool: dict[str, int]   # language -> コンテナ数

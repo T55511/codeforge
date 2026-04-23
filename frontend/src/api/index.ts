@@ -33,6 +33,13 @@ export const studentApi = {
       code,
       submission_id: submissionId,
     }),
+  giveup: (problemId: string, code: string, hintCount: number) =>
+    api.post<{ explanation: string; key_concepts: string[]; hints_used: number }>("/giveup", {
+      problem_id: problemId,
+      code,
+      hint_count: hintCount,
+    }),
+  getPoolStatus: () => api.get<Record<string, number>>("/sandbox/pool-status"),
 };
 
 export const adminApi = {
