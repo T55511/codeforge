@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from app.database import get_db
 from app.models.user import User, UserQuota
 from app.schemas.user import UserCreate, UserOut, TokenResponse, LoginRequest
@@ -17,10 +17,14 @@ async def register(body: UserCreate, db: AsyncSession = Depends(get_db)):
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="このメールアドレスはすでに登録されています")
 
+    count_result = await db.execute(select(func.count(User.id)))
+    is_first_user = count_result.scalar_one() == 0
+
     user = User(
         name=body.name,
         email=body.email,
         hashed_password=hash_password(body.password),
+        is_admin=is_first_user,
     )
     db.add(user)
     await db.flush()
