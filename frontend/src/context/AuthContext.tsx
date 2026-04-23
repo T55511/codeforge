@@ -20,7 +20,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchUser = async () => {
     try {
       const res = await studentApi.getDashboard();
-      setUser(res.data.user);
+      let userData = res.data.user;
+      // 管理者がまだ存在しない場合、自動的に昇格を試みる（初回セットアップ）
+      if (!userData.is_admin) {
+        try {
+          const claimRes = await authApi.claimAdmin();
+          userData = claimRes.data;
+        } catch {
+          // 403 = 管理者が既に存在する → 通常ユーザーとして続行
+        }
+      }
+      setUser(userData);
     } catch {
       // 401はclient.tsのインターセプターがtokenを削除してリダイレクト
       setUser(null);

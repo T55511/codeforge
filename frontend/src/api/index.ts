@@ -6,6 +6,7 @@ export const authApi = {
     api.post<{ access_token: string }>("/auth/login", { email, password }),
   register: (name: string, email: string, password: string) =>
     api.post("/auth/register", { name, email, password }),
+  claimAdmin: () => api.post("/auth/claim-admin"),
 };
 
 export const studentApi = {
