@@ -9,21 +9,24 @@ import app.models  # 全てのモデルを読み込んでBaseに登録する
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 起動時にテーブルを作成
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
+    # 起動時: 1. データベーステーブルの作成
+    print("Initializing database tables...")
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("Database initialization complete.")
+    except Exception as e:
+        print(f"Database initialization failed: {e}")
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # 起動時: ウォームスタンバイプールをバックグラウンドで補充
+    # 起動時: 2. ウォームスタンバイプールをバックグラウンドで補充
     try:
         from app.workers.tasks import warmup_all_pools_task
         warmup_all_pools_task.delay()
     except Exception:
         pass
+    
     yield
+
     # シャットダウン時: プール内コンテナを破棄
     try:
         from app.workers.tasks import drain_all_pools_task
@@ -56,5 +59,8 @@ app.include_router(admin_router)
 async def health():
     from app.services.pool_manager import pool_size
     from app.services.sandbox import LANGUAGE_IMAGES
-    pool_status = {lang: pool_size(lang) for lang in LANGUAGE_IMAGES}
+    try:
+        pool_status = {lang: pool_size(lang) for lang in LANGUAGE_IMAGES}
+    except Exception:
+        pool_status = "unavailable"
     return {"status": "ok", "pool": pool_status}
