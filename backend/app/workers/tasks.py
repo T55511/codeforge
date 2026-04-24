@@ -94,10 +94,59 @@ def execute_code_task(
 
 
 @celery_app.task(name="generate_problems_task")
-def generate_problems_task(language_id: str, tag_id: str, difficulty: int, count: int = 5):
+def generate_problems_task(language_id: str, tag_id: str, difficulty: int, count: int = 5, judgment_type: str = "STDOUT"):
     """AIによる問題一括生成タスク（管理者向け）"""
-    from app.services.ai import generate_problems_sync
-    return generate_problems_sync(language_id, tag_id, difficulty, count)
+    import uuid
+    from sqlalchemy import select
+    from app.database import AsyncSessionLocal
+    from app.models.language import Language
+    from app.models.tag import Tag
+    from app.models.problem import Problem
+    from app.services.ai import generate_problems
+
+    async def _run():
+        async with AsyncSessionLocal() as db:
+            lang = (await db.execute(
+                select(Language).where(Language.id == uuid.UUID(language_id))
+            )).scalar_one_or_none()
+            tag = (await db.execute(
+                select(Tag).where(Tag.id == uuid.UUID(tag_id))
+            )).scalar_one_or_none()
+            if not lang or not tag:
+                return {"status": "ERROR", "error": "Language or Tag not found"}
+
+            problems_data = await generate_problems(
+                language_name=lang.name,
+                tag_name=tag.name,
+                category=tag.category,
+                difficulty=difficulty,
+                judgment_type=judgment_type,
+                count=count,
+            )
+
+            titles = []
+            for p in problems_data:
+                problem = Problem(
+                    language_id=lang.id,
+                    tag_id=tag.id,
+                    title=p.get("title", ""),
+                    description=p.get("description", ""),
+                    initial_code=p.get("initial_code", ""),
+                    solution=p.get("solution", ""),
+                    judgment_type=p.get("judgment_type", judgment_type),
+                    expected_output=p.get("expected_output"),
+                    test_cases=p.get("test_cases"),
+                    difficulty=p.get("difficulty", difficulty),
+                    status="AUTO_GENERATED",
+                    source="AI_GENERATED",
+                )
+                db.add(problem)
+                titles.append(p.get("title", ""))
+
+            await db.commit()
+            return {"status": "COMPLETED", "created": len(titles), "titles": titles}
+
+    return asyncio.run(_run())
 
 
 @celery_app.task(name="refill_pool_task")
