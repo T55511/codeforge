@@ -78,6 +78,7 @@ class GenerateProblemsRequest(BaseModel):
     tag_id: uuid.UUID
     difficulty: int = 1
     count: int = 5
+    judgment_type: str = "STDOUT"
 
 
 class GiveupRequest(BaseModel):

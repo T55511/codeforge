@@ -12,8 +12,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-COPY docker-entrypoint-worker.sh /docker-entrypoint-worker.sh
-RUN chmod +x /docker-entrypoint-worker.sh
-
-ENTRYPOINT ["/docker-entrypoint-worker.sh"]
 CMD ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info", "--concurrency=4"]
