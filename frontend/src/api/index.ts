@@ -1,12 +1,12 @@
 import api from "./client";
-import type { Language, SkillTreeNode, DashboardData, TaskResult } from "../types";
+import type { Language, SkillTreeNode, DashboardData, TaskResult, User } from "../types";
 
 export const authApi = {
   login: (email: string, password: string) =>
     api.post<{ access_token: string }>("/auth/login", { email, password }),
   register: (name: string, email: string, password: string) =>
     api.post("/auth/register", { name, email, password }),
-  claimAdmin: () => api.post("/auth/claim-admin"),
+  claimAdmin: () => api.post<User>("/auth/claim-admin"),
 };
 
 export const studentApi = {

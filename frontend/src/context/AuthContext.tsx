@@ -22,18 +22,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await studentApi.getDashboard();
       let userData = res.data.user;
-      // 管理者がまだ存在しない場合、自動的に昇格を試みる（初回セットアップ）
+
+      // 管理者がゼロの場合のみ昇格を試みる。成功したら再取得して確定させる
       if (!userData.is_admin) {
         try {
-          const claimRes = await authApi.claimAdmin();
-          userData = claimRes.data;
+          await authApi.claimAdmin();
+          const refreshed = await studentApi.getDashboard();
+          userData = refreshed.data.user;
         } catch {
-          // 403 = 管理者が既に存在する → 通常ユーザーとして続行
+          // 403=管理者が既に存在 / 404=エンドポイント未反映 → 通常ユーザーとして続行
         }
       }
+
       setUser(userData);
     } catch {
-      // 401はclient.tsのインターセプターがtokenを削除してリダイレクト
       setUser(null);
     } finally {
       setLoading(false);
