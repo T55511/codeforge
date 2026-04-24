@@ -279,5 +279,6 @@ async def generate_problems_endpoint(
         tag_id=str(body.tag_id),
         difficulty=body.difficulty,
         count=body.count,
+        judgment_type=body.judgment_type,
     )
     return ExecuteResponse(task_id=task.id)
