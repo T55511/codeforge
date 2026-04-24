@@ -1,20 +1,37 @@
-# Node
-node_modules/
-frontend/node_modules/
-frontend/dist/
 
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 .venv/
 venv/
-backend/**/__pycache__/
+*.egg-info/
+dist/
+build/
+.eggs/
 
-# Environment
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Lock files generated locally (keep package-lock.json)
+# package-lock.json
+
+# Env
 .env
-.env.*
-!.env.example
+.env.local
+.env.*.local
 
-# Docker volumes / OS
+# Docker volumes / data
+postgres_data/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
 .DS_Store
+Thumbs.db

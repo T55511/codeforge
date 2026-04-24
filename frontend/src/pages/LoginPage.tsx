@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../hooks/useAuth";
+import { useAuthContext } from "../context/AuthContext";
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login } = useAuthContext();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

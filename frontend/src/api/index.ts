@@ -1,11 +1,12 @@
 import api from "./client";
-import type { Language, SkillTreeNode, DashboardData, TaskResult } from "../types";
+import type { Language, SkillTreeNode, DashboardData, TaskResult, User } from "../types";
 
 export const authApi = {
   login: (email: string, password: string) =>
     api.post<{ access_token: string }>("/auth/login", { email, password }),
   register: (name: string, email: string, password: string) =>
     api.post("/auth/register", { name, email, password }),
+  claimAdmin: () => api.post<User>("/auth/claim-admin"),
 };
 
 export const studentApi = {
@@ -40,6 +41,8 @@ export const studentApi = {
       hint_count: hintCount,
     }),
   getPoolStatus: () => api.get<Record<string, number>>("/sandbox/pool-status"),
+  getNextProblem: (tagId: string) =>
+    api.get<{ problem_id: string; title: string }>(`/problems/next?tag_id=${tagId}`),
 };
 
 export const adminApi = {

@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { studentApi } from "../api";
+import { studentApi, authApi } from "../api";
+import { useAuthContext } from "../context/AuthContext";
 import type { DashboardData, Language } from "../types";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const { isAdmin, refreshUser } = useAuthContext();
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [languages, setLanguages] = useState<Language[]>([]);
   const [loading, setLoading] = useState(true);
+  const [claimMsg, setClaimMsg] = useState("");
+  const [claiming, setClaiming] = useState(false);
 
   useEffect(() => {
     Promise.all([studentApi.getDashboard(), studentApi.getLanguages()])
@@ -17,6 +21,27 @@ export default function DashboardPage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const handleClaimAdmin = async () => {
+    setClaiming(true);
+    setClaimMsg("");
+    try {
+      await authApi.claimAdmin();
+      await refreshUser();
+      setClaimMsg("✓ 管理者権限を取得しました");
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
+      if (err.response?.status === 403) {
+        setClaimMsg("管理者がすでに存在します。既存の管理者に昇格を依頼してください。");
+      } else if (err.response?.status === 404) {
+        setClaimMsg("バックエンドを再起動してください（docker-compose restart backend）");
+      } else {
+        setClaimMsg(detail || "権限取得に失敗しました");
+      }
+    } finally {
+      setClaiming(false);
+    }
+  };
 
   if (loading) return <div style={styles.loading}>読み込み中...</div>;
   if (!dashboard) return null;
@@ -29,8 +54,23 @@ export default function DashboardPage() {
           <span style={styles.rank}>{dashboard.user.rank}</span>
           <span style={styles.exp}>{dashboard.user.total_exp} EXP</span>
           <span style={styles.streak}>🔥 {dashboard.user.streak_days}日</span>
+          {isAdmin ? (
+            <button style={styles.adminBtn} onClick={() => navigate("/admin")}>
+              ⚙ 管理者画面
+            </button>
+          ) : (
+            <button style={styles.claimBtn} onClick={handleClaimAdmin} disabled={claiming}>
+              {claiming ? "確認中..." : "管理者権限を取得"}
+            </button>
+          )}
         </div>
       </header>
+
+      {claimMsg && (
+        <div style={{ ...styles.claimMsg, color: claimMsg.startsWith("✓") ? "#3fb950" : "#f85149" }}>
+          {claimMsg}
+        </div>
+      )}
 
       <main style={styles.main}>
         <section style={styles.statsRow}>
@@ -100,6 +140,9 @@ const styles: Record<string, React.CSSProperties> = {
   rank: { background: "#1f6feb", color: "#fff", padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600 },
   exp: { color: "#f0c946", fontWeight: 600 },
   streak: { color: "#ff6e40", fontWeight: 600 },
+  adminBtn: { background: "#6e40c9", color: "#fff", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" },
+  claimBtn: { background: "none", border: "1px solid #30363d", color: "#8b949e", borderRadius: 6, padding: "5px 14px", fontSize: 12, cursor: "pointer" },
+  claimMsg: { padding: "8px 32px", fontSize: 13, background: "#161b22", borderBottom: "1px solid #21262d" },
   main: { maxWidth: 1000, margin: "0 auto", padding: "40px 24px" },
   statsRow: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 40 },
   statCard: {
