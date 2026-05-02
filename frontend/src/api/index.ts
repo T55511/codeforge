@@ -1,5 +1,5 @@
 import api from "./client";
-import type { Language, SkillTreeNode, DashboardData, TaskResult, User } from "../types";
+import type { Language, SkillTreeNode, DashboardData, TaskResult, User, Problem } from "../types";
 
 export const authApi = {
   login: (email: string, password: string) =>
@@ -41,6 +41,8 @@ export const studentApi = {
       hint_count: hintCount,
     }),
   getPoolStatus: () => api.get<Record<string, number>>("/sandbox/pool-status"),
+  getProblem: (problemId: string) =>
+    api.get<Problem>(`/problems/${problemId}`),
   getNextProblem: (tagId: string) =>
     api.get<{ problem_id: string; title: string }>(`/problems/next?tag_id=${tagId}`),
 };

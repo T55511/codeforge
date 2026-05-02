@@ -27,22 +27,12 @@ export default function WorkspacePage() {
 
   useEffect(() => {
     if (!problemId) return;
-    setProblem({
-      id: problemId,
-      language_id: "",
-      tag_id: "",
-      title: "問題を読み込み中...",
-      description: "",
-      initial_code: "# コードをここに書いてください\n",
-      judgment_type: "STDOUT",
-      test_cases: null,
-      expected_output: null,
-      difficulty: 1,
-      status: "APPROVED",
-      source: "MANUAL",
-      created_at: "",
-    });
-    setCode("# コードをここに書いてください\n");
+    studentApi.getProblem(problemId)
+      .then((res) => {
+        setProblem(res.data);
+        setCode(res.data.initial_code || "");
+      })
+      .catch(() => navigate("/"));
   }, [problemId]);
 
   useEffect(() => {

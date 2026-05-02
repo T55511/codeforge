@@ -12,7 +12,7 @@ from app.models.submission import Submission
 from app.models.user import User, UserQuota, UserTagProgress
 from app.schemas.language import LanguageOut
 from app.schemas.tag import SkillTreeNode, TagDependencyOut
-from app.schemas.problem import ExecuteRequest, ExecuteResponse, TaskResult, GiveupRequest, GiveupResponse
+from app.schemas.problem import ExecuteRequest, ExecuteResponse, TaskResult, GiveupRequest, GiveupResponse, ProblemOut
 from app.schemas.user import DashboardOut, ChatRequest, ChatResponse, ReviewRequest, ReviewResponse
 from app.services.auth import get_current_user
 from app.services.ai import get_hint, review_code, get_giveup_explanation
@@ -98,6 +98,22 @@ async def get_skill_tree(
         )
 
     return nodes
+
+
+@router.get("/problems/{problem_id}", response_model=ProblemOut)
+async def get_problem(
+    problem_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """問題の詳細を取得する（solution は含まない）"""
+    result = await db.execute(
+        select(Problem).where(Problem.id == problem_id, Problem.status == "APPROVED")
+    )
+    problem = result.scalar_one_or_none()
+    if not problem:
+        raise HTTPException(status_code=404, detail="問題が見つかりません")
+    return problem
 
 
 @router.get("/problems/next")
@@ -266,13 +282,16 @@ async def chat_hint(
     lang_result = await db.execute(select(Language).where(Language.id == problem.language_id))
     language = lang_result.scalar_one_or_none()
 
-    reply = await get_hint(
-        problem_description=problem.description,
-        user_code=body.code,
-        error_log=body.error_log,
-        user_message=body.message,
-        language=language.name if language else "python",
-    )
+    try:
+        reply = await get_hint(
+            problem_description=problem.description,
+            user_code=body.code,
+            error_log=body.error_log,
+            user_message=body.message,
+            language=language.name if language else "python",
+        )
+    except Exception:
+        raise HTTPException(status_code=503, detail="AIサービスが一時的に利用できません。しばらく後に再試行してください。")
 
     quota.daily_count += 1
     await db.commit()
@@ -297,11 +316,14 @@ async def request_review(
     lang_result = await db.execute(select(Language).where(Language.id == problem.language_id))
     language = lang_result.scalar_one_or_none()
 
-    comments = await review_code(
-        problem_description=problem.description,
-        code=body.code,
-        language=language.name if language else "python",
-    )
+    try:
+        comments = await review_code(
+            problem_description=problem.description,
+            code=body.code,
+            language=language.name if language else "python",
+        )
+    except Exception:
+        raise HTTPException(status_code=503, detail="AIサービスが一時的に利用できません。しばらく後に再試行してください。")
 
     return ReviewResponse(comments=comments)
 
@@ -323,11 +345,14 @@ async def giveup(
     lang_result = await db.execute(select(Language).where(Language.id == problem.language_id))
     language = lang_result.scalar_one_or_none()
 
-    explanation, key_concepts = await get_giveup_explanation(
-        problem_description=problem.description,
-        user_code=body.code,
-        language=language.name if language else "python",
-    )
+    try:
+        explanation, key_concepts = await get_giveup_explanation(
+            problem_description=problem.description,
+            user_code=body.code,
+            language=language.name if language else "python",
+        )
+    except Exception:
+        raise HTTPException(status_code=503, detail="AIサービスが一時的に利用できません。しばらく後に再試行してください。")
 
     # ギブアップ提出をDBに記録（EXP は付与しない）
     from app.models.submission import Submission

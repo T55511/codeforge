@@ -1,8 +1,93 @@
 """Celery 非同期タスク"""
 import asyncio
+import uuid as uuid_mod
+from datetime import datetime
 from app.workers.celery_app import celery_app
 from app.services.judgment import judge
 from app.services.exp_calculator import calculate_exp
+
+
+RANK_THRESHOLDS = [
+    (1000, "ダイヤモンドコーダー"),
+    (600,  "プラチナコーダー"),
+    (300,  "ゴールドコーダー"),
+    (100,  "シルバーコーダー"),
+    (0,    "ブロンズコーダー"),
+]
+
+EXP_PER_LEVEL = 50
+
+
+def _calc_rank(total_exp: int) -> str:
+    for threshold, rank in RANK_THRESHOLDS:
+        if total_exp >= threshold:
+            return rank
+    return "ブロンズコーダー"
+
+
+async def _save_execution_result(
+    user_id: str,
+    problem_id: str,
+    code: str,
+    verdict: str,
+    hint_count: int,
+    exp_total: int,
+) -> None:
+    from sqlalchemy import select
+    from app.database import AsyncSessionLocal
+    from app.models.submission import Submission
+    from app.models.user import User, UserTagProgress
+    from app.models.problem import Problem
+    from app.models.tag import Tag
+
+    async with AsyncSessionLocal() as db:
+        db.add(Submission(
+            user_id=uuid_mod.UUID(user_id),
+            problem_id=uuid_mod.UUID(problem_id),
+            code=code,
+            result=verdict,
+            exp_earned=exp_total,
+            hint_count=hint_count,
+        ))
+
+        if verdict == "PASS" and exp_total > 0:
+            user = (await db.execute(
+                select(User).where(User.id == uuid_mod.UUID(user_id))
+            )).scalar_one_or_none()
+            if user:
+                user.total_exp += exp_total
+                user.rank = _calc_rank(user.total_exp)
+
+            problem = (await db.execute(
+                select(Problem).where(Problem.id == uuid_mod.UUID(problem_id))
+            )).scalar_one_or_none()
+            if problem:
+                tag = (await db.execute(
+                    select(Tag).where(Tag.id == problem.tag_id)
+                )).scalar_one_or_none()
+
+                prog = (await db.execute(
+                    select(UserTagProgress).where(
+                        UserTagProgress.user_id == uuid_mod.UUID(user_id),
+                        UserTagProgress.tag_id == problem.tag_id,
+                    )
+                )).scalar_one_or_none()
+                if not prog:
+                    prog = UserTagProgress(
+                        user_id=uuid_mod.UUID(user_id),
+                        tag_id=problem.tag_id,
+                        current_level=0,
+                        current_exp=0,
+                        updated_at=datetime.utcnow(),
+                    )
+                    db.add(prog)
+
+                prog.current_exp += exp_total
+                max_level = tag.max_level if tag else 5
+                prog.current_level = min(max_level, prog.current_exp // EXP_PER_LEVEL)
+                prog.updated_at = datetime.utcnow()
+
+        await db.commit()
 
 
 @celery_app.task(bind=True, name="execute_code_task")
@@ -21,7 +106,7 @@ def execute_code_task(
     threshold_ms: int | None,
     threshold_kb: int | None,
 ):
-    """コード実行・判定・EXP計算を非同期で実行する"""
+    """コード実行・判定・EXP計算・DB保存を非同期で実行する"""
     try:
         result = asyncio.run(
             judge(
@@ -56,6 +141,15 @@ def execute_code_task(
                 "efficient": breakdown.efficient,
                 "total": breakdown.total,
             }
+
+        asyncio.run(_save_execution_result(
+            user_id=user_id,
+            problem_id=problem_id,
+            code=code,
+            verdict=result.verdict,
+            hint_count=hint_count,
+            exp_total=exp_total,
+        ))
 
         return {
             "task_id": task_id,
@@ -126,22 +220,25 @@ def generate_problems_task(language_id: str, tag_id: str, difficulty: int, count
 
             titles = []
             for p in problems_data:
+                # 必須フィールドが揃っていない問題はスキップ
+                if not p.get("title") or not p.get("description") or not p.get("solution"):
+                    continue
                 problem = Problem(
                     language_id=lang.id,
                     tag_id=tag.id,
-                    title=p.get("title", ""),
-                    description=p.get("description", ""),
+                    title=p["title"][:200],
+                    description=p["description"],
                     initial_code=p.get("initial_code", ""),
-                    solution=p.get("solution", ""),
+                    solution=p["solution"],
                     judgment_type=p.get("judgment_type", judgment_type),
                     expected_output=p.get("expected_output"),
                     test_cases=p.get("test_cases"),
-                    difficulty=p.get("difficulty", difficulty),
+                    difficulty=int(p.get("difficulty", difficulty)),
                     status="AUTO_GENERATED",
                     source="AI_GENERATED",
                 )
                 db.add(problem)
-                titles.append(p.get("title", ""))
+                titles.append(p["title"])
 
             await db.commit()
             return {"status": "COMPLETED", "created": len(titles), "titles": titles}
