@@ -1,5 +1,5 @@
 """認証エンドポイント"""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -33,7 +33,7 @@ async def register(body: UserCreate, db: AsyncSession = Depends(get_db)):
         user_id=user.id,
         daily_count=0,
         limit=10,
-        reset_at=datetime.utcnow().replace(hour=0, minute=0, second=0) + timedelta(days=1),
+        reset_at=datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, tzinfo=None) + timedelta(days=1),
     )
     db.add(quota)
     await db.commit()

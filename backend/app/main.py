@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,6 +7,8 @@ from app.api.student import router as student_router
 from app.api.admin import router as admin_router
 from app.database import engine, Base
 import app.models  # 全てのモデルを読み込んでBaseに登録する
+
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -22,17 +25,17 @@ async def lifespan(app: FastAPI):
     try:
         from app.workers.tasks import warmup_all_pools_task
         warmup_all_pools_task.delay()
-    except Exception:
-        pass
-    
+    except Exception as e:
+        logger.warning("プールウォームアップのキュー投入に失敗しました: %s", e)
+
     yield
 
     # シャットダウン時: プール内コンテナを破棄
     try:
         from app.workers.tasks import drain_all_pools_task
         drain_all_pools_task.delay()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("プールドレインのキュー投入に失敗しました: %s", e)
 
 
 app = FastAPI(
@@ -61,6 +64,7 @@ async def health():
     from app.services.sandbox import LANGUAGE_IMAGES
     try:
         pool_status = {lang: pool_size(lang) for lang in LANGUAGE_IMAGES}
-    except Exception:
+    except Exception as e:
+        logger.warning("プールステータス取得失敗: %s", e)
         pool_status = "unavailable"
     return {"status": "ok", "pool": pool_status}

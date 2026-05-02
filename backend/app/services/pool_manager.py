@@ -8,12 +8,15 @@ Dockerコンテナのウォームスタンバイプール管理。
   実行時: RPOP でコンテナを取得し、コード注入→実行→削除する
   削除後: 補充タスクを非同期で起動して空きを補填する
 """
+import logging
 import time
 import uuid
 import docker
 import redis as redis_sync
 from app.config import settings
 from app.services.sandbox import LANGUAGE_IMAGES, LANGUAGE_RUN_COMMANDS
+
+logger = logging.getLogger(__name__)
 
 POOL_KEY_PREFIX = "sandbox:pool:"
 POOL_LOCK_KEY_PREFIX = "sandbox:pool_lock:"
@@ -91,8 +94,8 @@ def destroy_container(container_id: str) -> None:
         client = _docker_client()
         container = client.containers.get(container_id)
         container.remove(force=True)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("コンテナ削除失敗 (%s): %s", container_id[:12], e)
 
 
 def warmup_pool(language: str, target_size: int | None = None) -> int:

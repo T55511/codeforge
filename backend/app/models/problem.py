@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Integer, SmallInteger, String, Text, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -25,7 +25,7 @@ class Problem(Base):
     difficulty: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)  # 1=入門/2=中級/3=応用
     status: Mapped[str] = mapped_column(String, nullable=False, default="AUTO_GENERATED")  # AUTO_GENERATED / APPROVED / ARCHIVED
     source: Mapped[str] = mapped_column(String, nullable=False, default="MANUAL")  # AI_GENERATED / MANUAL
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     language = relationship("Language", back_populates="problems")
     tag = relationship("Tag", back_populates="problems")

@@ -1,7 +1,7 @@
 """Celery 非同期タスク"""
 import asyncio
 import uuid as uuid_mod
-from datetime import datetime
+from datetime import datetime, timezone
 from app.workers.celery_app import celery_app
 from app.services.judgment import judge
 from app.services.exp_calculator import calculate_exp
@@ -78,14 +78,14 @@ async def _save_execution_result(
                         tag_id=problem.tag_id,
                         current_level=0,
                         current_exp=0,
-                        updated_at=datetime.utcnow(),
+                        updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
                     )
                     db.add(prog)
 
                 prog.current_exp += exp_total
                 max_level = tag.max_level if tag else 5
                 prog.current_level = min(max_level, prog.current_exp // EXP_PER_LEVEL)
-                prog.updated_at = datetime.utcnow()
+                prog.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
         await db.commit()
 

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, Text, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -14,6 +14,6 @@ class AiSkillSuggestion(Base):
     suggested_tag_ids: Mapped[list] = mapped_column(ARRAY(UUID(as_uuid=True)), nullable=False)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String, nullable=False, default="PENDING")  # PENDING / APPROVED / REJECTED
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     template = relationship("SkillTemplate", back_populates="ai_suggestions")

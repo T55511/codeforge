@@ -8,11 +8,14 @@
 """
 import asyncio
 import io
+import logging
 import tarfile
 import time
 import docker
 from dataclasses import dataclass
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 LANGUAGE_IMAGES = {
     "python": "python:3.11-slim",
@@ -127,12 +130,12 @@ def _execute_on_standby(
         stdout_str = (stdout_b or b"").decode("utf-8", errors="replace")
         stderr_str = (stderr_b or b"").decode("utf-8", errors="replace")
 
-        # メモリ使用量（stats は重いので軽量化のため 0 に近似）
         try:
             stats = container.stats(stream=False)
             mem_usage = stats.get("memory_stats", {}).get("usage", 0)
             memory_kb = mem_usage // 1024
-        except Exception:
+        except Exception as e:
+            logger.debug("メモリ統計取得失敗 (%s): %s", container_id[:12], e)
             memory_kb = 0
 
         return ExecutionResult(
@@ -225,8 +228,8 @@ def _execute_fresh(
         finally:
             try:
                 container.remove(force=True)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("フレッシュコンテナ削除失敗: %s", e)
 
     except docker.errors.ImageNotFound:
         return ExecutionResult(
@@ -256,5 +259,5 @@ def _schedule_pool_refill(lang_key: str) -> None:
     try:
         from app.workers.tasks import refill_pool_task
         refill_pool_task.delay(lang_key)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("プール補充タスクのキュー投入失敗 (%s): %s", lang_key, e)

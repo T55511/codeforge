@@ -1,6 +1,6 @@
 """生徒向けAPIエンドポイント"""
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -140,7 +140,7 @@ async def get_dashboard(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    one_week_ago = datetime.utcnow() - timedelta(days=7)
+    one_week_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
     subs_result = await db.execute(
         select(Submission).where(
             Submission.user_id == current_user.id,
@@ -153,13 +153,21 @@ async def get_dashboard(
     passed = sum(1 for s in recent_subs if s.result == "PASS")
     accuracy = (passed / total * 100) if total > 0 else 0.0
 
-    # 次の1問: 解放済みスキルの中から未クリアの問題を1件取得
-    next_problem = await db.execute(
-        select(Problem)
-        .where(Problem.status == "APPROVED")
-        .order_by(func.random())
-        .limit(1)
+    # 次の1問: 未クリアの問題を難易度昇順でランダムに1件取得
+    passed_ids_result = await db.execute(
+        select(Submission.problem_id).where(
+            Submission.user_id == current_user.id,
+            Submission.result == "PASS",
+        ).distinct()
     )
+    passed_ids = [r[0] for r in passed_ids_result.all()]
+
+    next_q = select(Problem).where(Problem.status == "APPROVED")
+    if passed_ids:
+        next_q = next_q.where(Problem.id.not_in(passed_ids))
+    next_q = next_q.order_by(Problem.difficulty, func.random()).limit(1)
+
+    next_problem = await db.execute(next_q)
     np = next_problem.scalar_one_or_none()
 
     return DashboardOut(
@@ -258,7 +266,7 @@ async def chat_hint(
     )
     quota = quota_result.scalar_one_or_none()
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     if quota:
         if quota.reset_at <= now:
             quota.daily_count = 0
@@ -308,6 +316,16 @@ async def request_review(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    sub_result = await db.execute(
+        select(Submission).where(
+            Submission.id == body.submission_id,
+            Submission.user_id == current_user.id,
+        )
+    )
+    submission = sub_result.scalar_one_or_none()
+    if not submission:
+        raise HTTPException(status_code=404, detail="提出記録が見つかりません")
+
     problem_result = await db.execute(select(Problem).where(Problem.id == body.problem_id))
     problem = problem_result.scalar_one_or_none()
     if not problem:
@@ -319,7 +337,7 @@ async def request_review(
     try:
         comments = await review_code(
             problem_description=problem.description,
-            code=body.code,
+            code=submission.code,
             language=language.name if language else "python",
         )
     except Exception:
